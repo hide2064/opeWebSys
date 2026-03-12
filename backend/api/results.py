@@ -22,8 +22,7 @@ class ResultResponse(BaseModel):
     bler: Optional[float]
     raw_data: Optional[str]
 
-    class Config:
-        from_attributes = True
+    model_config = {"from_attributes": True}
 
 
 @router.get("/", response_model=List[ResultResponse])
