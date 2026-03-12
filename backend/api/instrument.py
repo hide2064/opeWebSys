@@ -108,6 +108,10 @@ async def measure(req: MeasureRequest, db: Session = Depends(get_db)):
             setting.frequency,
             setting.bandwidth,
             setting.power_level,
+            setting.duplex_mode,
+            setting.expected_power,
+            setting.channel_number,
+            setting.meas_count,
         )
         results: dict = await loop.run_in_executor(None, instrument.measure, setting.rat)
 

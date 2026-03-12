@@ -12,21 +12,27 @@ router = APIRouter()
 
 class SettingCreate(BaseModel):
     name: str
-    rat: str = "LTE"          # LTE / WCDMA / GSM / NR5G
-    frequency: float          # MHz
-    bandwidth: float          # MHz
-    power_level: float        # dBm
-    channel_number: Optional[int] = None
+    rat: str = "LTE"                  # LTE / WCDMA / GSM / NR5G
+    duplex_mode: str = "FDD"          # FDD / TDD
+    frequency: float                  # MHz (DL中心周波数)
+    bandwidth: float = 10.0           # MHz
+    channel_number: Optional[int] = None  # EARFCN / UARFCN / ARFCN
+    power_level: float = -20.0        # 参照レベル (dBm)
+    expected_power: float = -10.0     # 期待UE送信電力 (dBm)
+    meas_count: int = 1               # 測定回数
 
 
 class SettingResponse(BaseModel):
     id: int
     name: str
     rat: str
+    duplex_mode: str
     frequency: float
     bandwidth: float
-    power_level: float
     channel_number: Optional[int]
+    power_level: float
+    expected_power: float
+    meas_count: int
     created_at: datetime
     updated_at: datetime
 

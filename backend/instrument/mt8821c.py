@@ -113,11 +113,25 @@ class MT8821C:
     # 設定適用
     # ------------------------------------------------------------------
 
-    def apply_setting(self, frequency: float, bandwidth: float, power_level: float) -> None:
-        """周波数(MHz)・帯域幅(MHz)・電力レベル(dBm) を設定"""
+    def apply_setting(
+        self,
+        frequency: float,
+        bandwidth: float,
+        power_level: float,
+        duplex_mode: str = "FDD",
+        expected_power: float = -10.0,
+        channel_number: int | None = None,
+        meas_count: int = 1,
+    ) -> None:
+        """MT8821C へ全設定パラメータを送信する"""
+        self.write(CMD.DUPLEX_MODE.format(mode=duplex_mode.upper()))
         self.write(CMD.FREQ_CENTER.format(freq=frequency))
         self.write(CMD.BAND_WIDTH.format(bw=bandwidth))
         self.write(CMD.LEVEL_REF.format(level=power_level))
+        self.write(CMD.EXP_POWER.format(power=expected_power))
+        self.write(CMD.MEAS_COUNT.format(count=max(1, meas_count)))
+        if channel_number is not None:
+            self.write(CMD.CHAN_DL.format(ch=channel_number))
 
     # ------------------------------------------------------------------
     # 測定実行

@@ -21,5 +21,14 @@ def get_db():
 
 
 def create_tables():
+    import time
     from db import models  # noqa: F401
-    Base.metadata.create_all(bind=engine)
+    for attempt in range(10):
+        try:
+            Base.metadata.create_all(bind=engine)
+            return
+        except Exception as e:
+            if attempt == 9:
+                raise
+            print(f"DB接続待機中... ({attempt + 1}/10): {e}")
+            time.sleep(3)

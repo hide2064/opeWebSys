@@ -9,11 +9,14 @@ class Setting(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     name: Mapped[str] = mapped_column(String(100), nullable=False)
-    rat: Mapped[str] = mapped_column(String(20), nullable=False, default="LTE")   # LTE / WCDMA / GSM / NR5G
-    frequency: Mapped[float] = mapped_column(Float, nullable=False)               # MHz
-    bandwidth: Mapped[float] = mapped_column(Float, nullable=False)               # MHz
-    power_level: Mapped[float] = mapped_column(Float, nullable=False)             # dBm
-    channel_number: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    rat: Mapped[str] = mapped_column(String(20), nullable=False, default="LTE")       # LTE / WCDMA / GSM / NR5G
+    duplex_mode: Mapped[str] = mapped_column(String(10), nullable=False, default="FDD")  # FDD / TDD
+    frequency: Mapped[float] = mapped_column(Float, nullable=False)                   # MHz (DL中心周波数)
+    bandwidth: Mapped[float] = mapped_column(Float, nullable=False)                   # MHz
+    channel_number: Mapped[int | None] = mapped_column(Integer, nullable=True)        # EARFCN / UARFCN / ARFCN
+    power_level: Mapped[float] = mapped_column(Float, nullable=False, default=-20.0)  # 参照レベル (dBm)
+    expected_power: Mapped[float] = mapped_column(Float, nullable=False, default=-10.0)  # 期待UE送信電力 (dBm)
+    meas_count: Mapped[int] = mapped_column(Integer, nullable=False, default=1)       # 測定回数
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 

@@ -21,6 +21,23 @@ class CMD:
     LEVEL_REF         = "DISP:WIND:TRAC:Y:RLEV {level}DBM"
     LEVEL_REF_QUERY   = "DISP:WIND:TRAC:Y:RLEV?"
 
+    # --- 複信方式 ---
+    DUPLEX_MODE       = "CALL:DUPLEX {mode}"    # FDD / TDD
+    DUPLEX_MODE_QUERY = "CALL:DUPLEX?"
+
+    # --- チャネル番号 (EARFCN / UARFCN / ARFCN) ---
+    CHAN_DL           = "FREQ:CHAN:DL {ch}"
+    CHAN_UL           = "FREQ:CHAN:UL {ch}"
+    CHAN_QUERY        = "FREQ:CHAN:DL?"
+
+    # --- 期待UE送信電力 ---
+    EXP_POWER         = "POW:EXP {power}DBM"
+    EXP_POWER_QUERY   = "POW:EXP?"
+
+    # --- 測定回数 ---
+    MEAS_COUNT        = "SENS:AVER:COUN {count}"
+    MEAS_COUNT_QUERY  = "SENS:AVER:COUN?"
+
     # --- 測定トリガ ---
     MEAS_INIT         = "INIT:IMM"
     MEAS_ABORT        = "ABOR"
