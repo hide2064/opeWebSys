@@ -34,7 +34,7 @@ def list_results(
     q = db.query(MeasurementResult)
     if setting_id:
         q = q.filter(MeasurementResult.setting_id == setting_id)
-    return q.order_by(MeasurementResult.timestamp.desc()).limit(limit).all()
+    return q.order_by(MeasurementResult.timestamp.desc(), MeasurementResult.id.desc()).limit(limit).all()
 
 
 @router.get("/{result_id}", response_model=ResultResponse)

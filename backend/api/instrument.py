@@ -10,6 +10,9 @@ from sqlalchemy.orm import Session
 from db.database import get_db
 from db.models import MeasurementResult, Setting
 from instrument.mt8821c import MT8821C, MT8821CError
+from core.logger import get_logger
+
+logger = get_logger("instrument")
 
 router = APIRouter()
 ws_router = APIRouter()
@@ -76,16 +79,20 @@ def get_status():
 def connect(req: Optional[ConnectRequest] = None):
     if req and req.host:
         instrument.host = req.host
+    logger.info(f"MT8821C 接続要求: host={instrument.host}:{instrument.port}")
     try:
         instrument.connect()
         idn = instrument.identify()
+        logger.info(f"MT8821C 接続成功: {idn}")
         return {"status": "connected", "identity": idn}
     except MT8821CError as e:
+        logger.error(f"MT8821C 接続失敗: {e}")
         raise HTTPException(status_code=503, detail=str(e))
 
 
 @router.post("/disconnect")
 def disconnect():
+    logger.info("MT8821C 切断")
     instrument.disconnect()
     return {"status": "disconnected"}
 
@@ -93,11 +100,18 @@ def disconnect():
 @router.post("/measure")
 async def measure(req: MeasureRequest, db: Session = Depends(get_db)):
     if not instrument.is_connected:
+        logger.warning("測定要求: MT8821C 未接続")
         raise HTTPException(status_code=503, detail="MT8821C に接続されていません")
 
     setting: Optional[Setting] = db.query(Setting).filter(Setting.id == req.setting_id).first()
     if not setting:
+        logger.warning(f"測定要求: 設定 ID={req.setting_id} が見つかりません")
         raise HTTPException(status_code=404, detail="設定が見つかりません")
+
+    logger.info(
+        f"測定開始: setting_id={setting.id} name='{setting.name}' "
+        f"RAT={setting.rat} freq={setting.frequency}MHz"
+    )
 
     # ブロッキング I/O をスレッドプールで実行
     loop = asyncio.get_event_loop()
@@ -129,6 +143,14 @@ async def measure(req: MeasureRequest, db: Session = Depends(get_db)):
         db.commit()
         db.refresh(result)
 
+        logger.info(
+            f"測定成功: result_id={result.id} "
+            f"tx_power={results.get('tx_power')} dBm  "
+            f"evm={results.get('evm')} %  "
+            f"freq_err={results.get('frequency_error')} Hz  "
+            f"bler={results.get('bler')}"
+        )
+
         await manager.broadcast({
             "type": "measurement_result",
             "data": {
@@ -152,6 +174,8 @@ async def measure(req: MeasureRequest, db: Session = Depends(get_db)):
         db.add(result)
         db.commit()
 
+        logger.error(f"測定失敗: setting_id={setting.id} error={e}")
+
         await manager.broadcast({"type": "measurement_error", "error": str(e)})
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -162,8 +186,10 @@ async def measure(req: MeasureRequest, db: Session = Depends(get_db)):
 @ws_router.websocket("/ws")
 async def websocket_endpoint(ws: WebSocket):
     await manager.connect(ws)
+    logger.debug(f"WebSocket 接続: client={ws.client}")
     try:
         while True:
             await ws.receive_text()  # クライアントからのメッセージ待機（切断検出用）
     except WebSocketDisconnect:
         manager.disconnect(ws)
+        logger.debug(f"WebSocket 切断: client={ws.client}")

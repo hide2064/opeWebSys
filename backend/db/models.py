@@ -4,6 +4,19 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from db.database import Base
 
 
+class SystemLog(Base):
+    """アプリケーション動作ログ"""
+    __tablename__ = "system_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc), index=True
+    )
+    level: Mapped[str] = mapped_column(String(20), nullable=False, index=True)
+    logger: Mapped[str] = mapped_column(String(100), nullable=False)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+
+
 class Setting(Base):
     __tablename__ = "settings"
 

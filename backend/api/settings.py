@@ -6,6 +6,9 @@ from sqlalchemy.orm import Session
 
 from db.database import get_db
 from db.models import Setting
+from core.logger import get_logger
+
+logger = get_logger("settings")
 
 router = APIRouter()
 
@@ -58,6 +61,7 @@ def create_setting(body: SettingCreate, db: Session = Depends(get_db)):
     db.add(setting)
     db.commit()
     db.refresh(setting)
+    logger.info(f"設定作成: id={setting.id} name='{setting.name}' RAT={setting.rat} freq={setting.frequency}MHz")
     return setting
 
 
@@ -70,6 +74,7 @@ def update_setting(setting_id: int, body: SettingCreate, db: Session = Depends(g
         setattr(setting, key, value)
     db.commit()
     db.refresh(setting)
+    logger.info(f"設定更新: id={setting.id} name='{setting.name}'")
     return setting
 
 
@@ -78,5 +83,6 @@ def delete_setting(setting_id: int, db: Session = Depends(get_db)):
     setting = db.query(Setting).filter(Setting.id == setting_id).first()
     if not setting:
         raise HTTPException(status_code=404, detail="設定が見つかりません")
+    logger.info(f"設定削除: id={setting.id} name='{setting.name}'")
     db.delete(setting)
     db.commit()

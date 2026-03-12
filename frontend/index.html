@@ -20,12 +20,17 @@
     .status-badge-success { background: #d1e7dd; color: #0f5132; }
     .status-badge-failed  { background: #f8d7da; color: #842029; }
     #chartContainer { height: 220px; }
+    .log-table { font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, monospace; font-size: 0.80rem; }
+    .log-row-error    { background: #fff5f5; }
+    .log-row-warning  { background: #fffbf0; }
+    .log-row-critical { background: #ffe4e4; }
+    .log-scroll { max-height: 65vh; overflow-y: auto; }
+    .nav-link { cursor: pointer; }
   </style>
 </head>
 <body>
-
 <div id="app">
-  <!-- ===== ナビゲーションバー ===== -->
+
   <nav class="navbar navbar-dark bg-dark px-3">
     <span class="navbar-brand">MT8821C Web Control System</span>
     <span class="d-flex align-items-center text-white">
@@ -35,13 +40,26 @@
     </span>
   </nav>
 
+  <div class="container-fluid pt-2 pb-0">
+    <ul class="nav nav-tabs">
+      <li class="nav-item">
+        <a class="nav-link" :class="page === 'measure' ? 'active fw-bold' : ''" @click="page = 'measure'">測定</a>
+      </li>
+      <li class="nav-item">
+        <a class="nav-link" :class="page === 'logs' ? 'active fw-bold' : ''" @click="switchToLogs()">
+          ログ
+          <span v-if="logErrorCount > 0" class="badge bg-danger ms-1">{{ logErrorCount }}</span>
+        </a>
+      </li>
+    </ul>
+  </div>
+
   <div class="container-fluid py-3">
-    <div class="row g-3">
 
-      <!-- ===== 左パネル ===== -->
+    <!-- ========== 測定ページ ========== -->
+    <div v-if="page === 'measure'" class="row g-3">
+
       <div class="col-md-3">
-
-        <!-- 接続設定 -->
         <div class="card shadow-sm mb-3">
           <div class="card-header fw-bold">接続設定</div>
           <div class="card-body">
@@ -57,14 +75,11 @@
           </div>
         </div>
 
-        <!-- 測定設定 -->
         <div class="card shadow-sm mb-3">
           <div class="card-header fw-bold d-flex justify-content-between align-items-center">
             測定設定
-            <button class="btn btn-outline-primary btn-sm py-0" @click="newSetting">＋ 新規</button>
+            <button class="btn btn-outline-primary btn-sm py-0" @click="newSetting">+ 新規</button>
           </div>
-
-          <!-- 設定一覧 -->
           <ul class="list-group list-group-flush" style="max-height:180px;overflow-y:auto">
             <li v-for="s in settings" :key="s.id"
                 class="list-group-item list-group-item-action py-2"
@@ -81,7 +96,7 @@
                   <button class="btn btn-sm btn-outline-secondary py-0 px-1" style="font-size:0.7rem"
                     @click.stop="editSetting(s)">編集</button>
                   <button class="btn btn-sm btn-outline-danger py-0 px-1" style="font-size:0.7rem"
-                    @click.stop="deleteSetting(s.id)">✕</button>
+                    @click.stop="deleteSetting(s.id)">&#x2715;</button>
                 </div>
               </div>
             </li>
@@ -89,15 +104,12 @@
           </ul>
         </div>
 
-        <!-- 設定フォーム (新規/編集時に表示) -->
         <div class="card shadow-sm mb-3 border-primary" v-if="showSettingForm">
           <div class="card-header fw-bold bg-primary text-white d-flex justify-content-between align-items-center py-2">
             <span>{{ form.id ? '設定を編集' : '新規設定' }}</span>
-            <button class="btn btn-sm btn-outline-light py-0" @click="showSettingForm = false">✕</button>
+            <button class="btn btn-sm btn-outline-light py-0" @click="showSettingForm = false">&#x2715;</button>
           </div>
           <div class="card-body" style="font-size:0.85rem">
-
-            <!-- 基本設定 -->
             <div class="fw-bold text-secondary mb-1" style="font-size:0.75rem">■ 基本設定</div>
             <div class="mb-2">
               <label class="form-label mb-1">設定名</label>
@@ -107,10 +119,7 @@
               <div class="col-7">
                 <label class="form-label mb-1">RAT</label>
                 <select v-model="form.rat" class="form-select form-select-sm" @change="onRatChange">
-                  <option>LTE</option>
-                  <option>WCDMA</option>
-                  <option>GSM</option>
-                  <option>NR5G</option>
+                  <option>LTE</option><option>WCDMA</option><option>GSM</option><option>NR5G</option>
                 </select>
               </div>
               <div class="col-5">
@@ -121,8 +130,6 @@
                 </select>
               </div>
             </div>
-
-            <!-- RF 設定 -->
             <div class="fw-bold text-secondary mb-1 mt-2" style="font-size:0.75rem">■ RF 設定</div>
             <div class="row g-2 mb-2">
               <div class="col-6">
@@ -137,17 +144,10 @@
               </div>
             </div>
             <div class="mb-2">
-              <label class="form-label mb-1">
-                チャネル番号
-                <span class="text-muted" style="font-size:0.72rem">
-                  ({{ { LTE:'EARFCN', WCDMA:'UARFCN', GSM:'ARFCN', NR5G:'NR-ARFCN' }[form.rat] }})
-                </span>
-              </label>
+              <label class="form-label mb-1">チャネル番号</label>
               <input v-model.number="form.channel_number" type="number" class="form-control form-control-sm"
                 placeholder="省略可 (周波数から自動設定)" />
             </div>
-
-            <!-- 電力設定 -->
             <div class="fw-bold text-secondary mb-1 mt-2" style="font-size:0.75rem">■ 電力設定</div>
             <div class="row g-2 mb-2">
               <div class="col-6">
@@ -159,24 +159,18 @@
                 <input v-model.number="form.expected_power" type="number" step="0.5" class="form-control form-control-sm" />
               </div>
             </div>
-
-            <!-- 測定設定 -->
             <div class="fw-bold text-secondary mb-1 mt-2" style="font-size:0.75rem">■ 測定設定</div>
             <div class="mb-3">
               <label class="form-label mb-1">測定回数</label>
               <input v-model.number="form.meas_count" type="number" min="1" max="1000" class="form-control form-control-sm" />
             </div>
-
             <div class="d-grid gap-2">
-              <button class="btn btn-primary btn-sm" @click="saveSetting">
-                {{ form.id ? '更新する' : '保存する' }}
-              </button>
+              <button class="btn btn-primary btn-sm" @click="saveSetting">{{ form.id ? '更新する' : '保存する' }}</button>
               <button class="btn btn-outline-secondary btn-sm" @click="showSettingForm = false">キャンセル</button>
             </div>
           </div>
         </div>
 
-        <!-- 選択中設定サマリ + 測定実行 -->
         <div class="card shadow-sm">
           <div class="card-body">
             <div v-if="selectedSetting" class="mb-2">
@@ -193,8 +187,7 @@
               </table>
             </div>
             <div v-else class="text-muted small text-center mb-2">設定を選択してください</div>
-            <button class="btn btn-danger w-100"
-              @click="measure"
+            <button class="btn btn-danger w-100" @click="measure"
               :disabled="!connected || !selectedSetting || measuring">
               <span v-if="measuring" class="spinner-border spinner-border-sm me-1"></span>
               {{ measuring ? '測定中...' : '測定実行' }}
@@ -202,13 +195,9 @@
             <div v-if="measureError" class="alert alert-danger mt-2 py-1 small">{{ measureError }}</div>
           </div>
         </div>
-
       </div>
 
-      <!-- ===== 右パネル ===== -->
       <div class="col-md-9">
-
-        <!-- 測定値カード -->
         <div class="row g-3 mb-3">
           <div class="col-sm-6 col-lg-3" v-for="m in metrics" :key="m.key">
             <div class="card shadow-sm card-metric h-100">
@@ -216,8 +205,7 @@
                 <div class="text-muted small">{{ m.label }}</div>
                 <div class="metric-value">
                   {{ latestResult && latestResult[m.key] !== null && latestResult[m.key] !== undefined
-                      ? latestResult[m.key].toFixed(m.digits)
-                      : '---' }}
+                      ? latestResult[m.key].toFixed(m.digits) : '---' }}
                 </div>
                 <div class="metric-unit">{{ m.unit }}</div>
               </div>
@@ -225,17 +213,13 @@
           </div>
         </div>
 
-        <!-- チャート -->
         <div class="card shadow-sm mb-3">
           <div class="card-header fw-bold">TX Power 履歴</div>
           <div class="card-body">
-            <div id="chartContainer">
-              <canvas id="powerChart"></canvas>
-            </div>
+            <div id="chartContainer"><canvas id="powerChart"></canvas></div>
           </div>
         </div>
 
-        <!-- 結果テーブル -->
         <div class="card shadow-sm">
           <div class="card-header fw-bold d-flex justify-content-between align-items-center">
             測定履歴
@@ -246,14 +230,9 @@
               <table class="table table-sm table-hover mb-0">
                 <thead class="table-dark">
                   <tr>
-                    <th>日時</th>
-                    <th>設定ID</th>
-                    <th>RAT</th>
-                    <th>TX Power (dBm)</th>
-                    <th>EVM (%)</th>
-                    <th>Freq Error (Hz)</th>
-                    <th>BLER (%)</th>
-                    <th>結果</th>
+                    <th>日時</th><th>設定ID</th><th>RAT</th>
+                    <th>TX Power (dBm)</th><th>EVM (%)</th>
+                    <th>Freq Error (Hz)</th><th>BLER (%)</th><th>結果</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -266,7 +245,8 @@
                     <td>{{ r.frequency_error !== null ? r.frequency_error?.toFixed(1) : '---' }}</td>
                     <td>{{ r.bler !== null ? r.bler?.toFixed(4) : '---' }}</td>
                     <td>
-                      <span class="badge" :class="r.status === 'success' ? 'status-badge-success' : 'status-badge-failed'">
+                      <span class="badge"
+                        :class="r.status === 'success' ? 'status-badge-success' : 'status-badge-failed'">
                         {{ r.status === 'success' ? '成功' : '失敗' }}
                       </span>
                     </td>
@@ -279,33 +259,98 @@
             </div>
           </div>
         </div>
-
       </div>
-    </div>
+    </div><!-- /measure -->
+
+    <!-- ========== ログページ ========== -->
+    <div v-if="page === 'logs'">
+      <div class="card shadow-sm">
+        <div class="card-header fw-bold d-flex justify-content-between align-items-center flex-wrap gap-2">
+          <span>
+            システムログ
+            <span class="text-muted fw-normal small ms-2">{{ logs.length }} 件表示</span>
+          </span>
+          <div class="d-flex gap-2 align-items-center flex-wrap">
+            <select v-model="logFilter" class="form-select form-select-sm" style="width:120px" @change="loadLogs">
+              <option value="">全レベル</option>
+              <option value="DEBUG">DEBUG</option>
+              <option value="INFO">INFO</option>
+              <option value="WARNING">WARNING</option>
+              <option value="ERROR">ERROR</option>
+              <option value="CRITICAL">CRITICAL</option>
+            </select>
+            <div class="form-check form-switch mb-0 d-flex align-items-center gap-1">
+              <input class="form-check-input" type="checkbox" id="autoRefresh" v-model="logAutoRefresh">
+              <label class="form-check-label small" for="autoRefresh">自動更新(5s)</label>
+            </div>
+            <button class="btn btn-sm btn-outline-secondary" @click="loadLogs">
+              <span v-if="logLoading" class="spinner-border spinner-border-sm"></span>
+              <span v-else>更新</span>
+            </button>
+            <button class="btn btn-sm btn-outline-danger" @click="clearLogs">クリア</button>
+          </div>
+        </div>
+        <div class="card-body p-0">
+          <div class="log-scroll">
+            <table class="table table-sm table-hover mb-0 log-table">
+              <thead class="table-dark sticky-top">
+                <tr>
+                  <th style="width:160px;white-space:nowrap">日時</th>
+                  <th style="width:90px">レベル</th>
+                  <th style="width:160px">ロガー</th>
+                  <th>メッセージ</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr v-for="log in logs" :key="log.id" :class="logRowClass(log.level)">
+                  <td class="text-nowrap">{{ formatDate(log.timestamp) }}</td>
+                  <td><span class="badge" :class="logBadgeClass(log.level)">{{ log.level }}</span></td>
+                  <td class="text-muted text-truncate" style="max-width:160px" :title="log.logger">
+                    {{ log.logger.replace('opeWebSys.', '') }}
+                  </td>
+                  <td style="white-space:pre-wrap;word-break:break-all">{{ log.message }}</td>
+                </tr>
+                <tr v-if="logs.length === 0 && !logLoading">
+                  <td colspan="4" class="text-center text-muted py-4">ログなし</td>
+                </tr>
+                <tr v-if="logLoading && logs.length === 0">
+                  <td colspan="4" class="text-center py-4">
+                    <span class="spinner-border spinner-border-sm"></span> 読み込み中...
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div><!-- /logs -->
+
   </div>
 </div>
 
 <script>
-const { createApp, ref, reactive, onMounted, nextTick } = Vue;
+const { createApp, ref, reactive, onMounted, onUnmounted, watch, computed } = Vue;
 
 const API = {
-  get:    (url)       => fetch(url).then(r => r.json()),
+  get:    url         => fetch(url).then(r => r.json()),
   post:   (url, body) => fetch(url, { method: 'POST',   headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) }).then(r => r.json()),
   put:    (url, body) => fetch(url, { method: 'PUT',    headers: {'Content-Type':'application/json'}, body: JSON.stringify(body) }).then(r => r.json()),
-  delete: (url)       => fetch(url, { method: 'DELETE' }),
+  delete: url         => fetch(url, { method: 'DELETE' }),
 };
 
 createApp({
   setup() {
-    const connected       = ref(false);
-    const identity        = ref('');
-    const connectHost     = ref('192.168.1.100');
-    const connectError    = ref('');
-    const loading         = ref(false);
+    const page = ref('measure');
+
+    const connected    = ref(false);
+    const identity     = ref('');
+    const connectHost  = ref('192.168.1.100');
+    const connectError = ref('');
+    const loading      = ref(false);
+
     const measuring       = ref(false);
     const measureError    = ref('');
     const showSettingForm = ref(false);
-
     const settings        = ref([]);
     const selectedSetting = ref(null);
     const results         = ref([]);
@@ -316,74 +361,115 @@ createApp({
       frequency: 2100, bandwidth: 10, channel_number: null,
       power_level: -20, expected_power: -10, meas_count: 1,
     });
-
-    // RAT ごとの帯域幅選択肢
     const bwOptions = ref([1.4, 3, 5, 10, 15, 20]);
 
     function onRatChange() {
-      if (form.rat === 'WCDMA') { form.duplex_mode = 'FDD'; form.bandwidth = 5; }
-      else if (form.rat === 'GSM') { form.duplex_mode = 'FDD'; form.bandwidth = 0.2; }
+      if (form.rat === 'WCDMA')     { form.duplex_mode = 'FDD'; form.bandwidth = 5; }
+      else if (form.rat === 'GSM')  { form.duplex_mode = 'FDD'; form.bandwidth = 0.2; }
       else if (form.rat === 'NR5G') { form.bandwidth = 100; }
       else { form.bandwidth = 10; }
-      if (form.rat === 'WCDMA' || form.rat === 'GSM') form.duplex_mode = 'FDD';
     }
 
     const metrics = [
-      { key: 'tx_power',       label: 'TX Power',       unit: 'dBm', digits: 2 },
-      { key: 'evm',            label: 'EVM',             unit: '%',   digits: 3 },
-      { key: 'frequency_error',label: '周波数誤差',       unit: 'Hz',  digits: 1 },
-      { key: 'bler',           label: 'BLER',            unit: '%',   digits: 4 },
+      { key: 'tx_power',        label: 'TX Power',  unit: 'dBm', digits: 2 },
+      { key: 'evm',             label: 'EVM',        unit: '%',   digits: 3 },
+      { key: 'frequency_error', label: '周波数誤差', unit: 'Hz',  digits: 1 },
+      { key: 'bler',            label: 'BLER',       unit: '%',   digits: 4 },
     ];
 
     let chart = null;
-    const chartLabels = [];
-    const chartData   = [];
+    const chartLabels = [], chartData = [];
 
     function initChart() {
       const ctx = document.getElementById('powerChart').getContext('2d');
       chart = new Chart(ctx, {
         type: 'line',
-        data: {
-          labels: chartLabels,
-          datasets: [{
-            label: 'TX Power (dBm)',
-            data: chartData,
-            borderColor: '#0d6efd',
-            backgroundColor: 'rgba(13,110,253,0.1)',
-            tension: 0.3,
-            fill: true,
-            pointRadius: 4,
-          }]
-        },
+        data: { labels: chartLabels, datasets: [{
+          label: 'TX Power (dBm)', data: chartData,
+          borderColor: '#0d6efd', backgroundColor: 'rgba(13,110,253,0.1)',
+          tension: 0.3, fill: true, pointRadius: 4,
+        }]},
         options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          scales: { y: { title: { display: true, text: 'dBm' } } },
-          plugins: { legend: { display: false } },
-        }
+          responsive: true, maintainAspectRatio: false,
+          scales: { y: { title: { display: true, text: 'dBm' }}},
+          plugins: { legend: { display: false }},
+        },
       });
     }
 
     function updateChart(ts, value) {
-      if (value === null || value === undefined) return;
-      chartLabels.push(ts);
-      chartData.push(value);
+      if (value == null) return;
+      chartLabels.push(ts); chartData.push(value);
       if (chartLabels.length > 30) { chartLabels.shift(); chartData.shift(); }
       chart && chart.update();
     }
 
-    // --- 接続 ---
+    // ---- ログ ----
+    const logs           = ref([]);
+    const logFilter      = ref('');
+    const logLoading     = ref(false);
+    const logAutoRefresh = ref(true);
+    let logTimer = null;
+
+    const logErrorCount = computed(() =>
+      logs.value.filter(l => l.level === 'ERROR' || l.level === 'CRITICAL').length
+    );
+
+    async function loadLogs() {
+      logLoading.value = true;
+      try {
+        const qs = logFilter.value ? `level=${logFilter.value}&limit=500` : 'limit=500';
+        logs.value = await API.get(`/api/logs/?${qs}`);
+      } catch(e) { console.error(e); }
+      logLoading.value = false;
+    }
+
+    async function clearLogs() {
+      if (!confirm('全ログを削除しますか？')) return;
+      await API.delete('/api/logs/');
+      logs.value = [];
+    }
+
+    function switchToLogs() { page.value = 'logs'; }
+
+    watch(page, val => {
+      clearInterval(logTimer);
+      if (val === 'logs') {
+        loadLogs();
+        if (logAutoRefresh.value) logTimer = setInterval(loadLogs, 5000);
+      }
+    });
+
+    watch(logAutoRefresh, val => {
+      clearInterval(logTimer);
+      if (val && page.value === 'logs') logTimer = setInterval(loadLogs, 5000);
+    });
+
+    function logBadgeClass(level) {
+      return {
+        'bg-secondary':         level === 'DEBUG',
+        'bg-info text-dark':    level === 'INFO',
+        'bg-warning text-dark': level === 'WARNING',
+        'bg-danger':            level === 'ERROR',
+        'bg-dark':              level === 'CRITICAL',
+      };
+    }
+
+    function logRowClass(level) {
+      if (level === 'ERROR')    return 'log-row-error';
+      if (level === 'WARNING')  return 'log-row-warning';
+      if (level === 'CRITICAL') return 'log-row-critical';
+      return '';
+    }
+
+    // ---- 接続 ----
     async function connect() {
       loading.value = true; connectError.value = '';
       try {
         const res = await API.post('/api/instrument/connect', { host: connectHost.value });
-        if (res.status === 'connected') {
-          connected.value = true;
-          identity.value  = res.identity || '';
-        } else {
-          connectError.value = res.detail || '接続失敗';
-        }
-      } catch (e) { connectError.value = '接続エラー: ' + e.message; }
+        if (res.status === 'connected') { connected.value = true; identity.value = res.identity || ''; }
+        else connectError.value = res.detail || '接続失敗';
+      } catch(e) { connectError.value = '接続エラー: ' + e.message; }
       loading.value = false;
     }
 
@@ -392,10 +478,8 @@ createApp({
       connected.value = false; identity.value = '';
     }
 
-    // --- 設定 ---
-    async function loadSettings() {
-      settings.value = await API.get('/api/settings/');
-    }
+    // ---- 設定 ----
+    async function loadSettings() { settings.value = await API.get('/api/settings/'); }
 
     function newSetting() {
       Object.assign(form, { id: null, name: '', rat: 'LTE', duplex_mode: 'FDD',
@@ -404,16 +488,8 @@ createApp({
       showSettingForm.value = true;
     }
 
-    function selectSetting(s) {
-      selectedSetting.value = s;
-      showSettingForm.value = false;
-    }
-
-    function editSetting(s) {
-      selectedSetting.value = s;
-      Object.assign(form, s);
-      showSettingForm.value = true;
-    }
+    function selectSetting(s) { selectedSetting.value = s; showSettingForm.value = false; }
+    function editSetting(s)   { selectedSetting.value = s; Object.assign(form, s); showSettingForm.value = true; }
 
     async function saveSetting() {
       const body = {
@@ -423,12 +499,9 @@ createApp({
         power_level: form.power_level, expected_power: form.expected_power,
         meas_count: form.meas_count,
       };
-      let saved;
-      if (form.id) {
-        saved = await API.put(`/api/settings/${form.id}`, body);
-      } else {
-        saved = await API.post('/api/settings/', body);
-      }
+      const saved = form.id
+        ? await API.put(`/api/settings/${form.id}`, body)
+        : await API.post('/api/settings/', body);
       await loadSettings();
       selectedSetting.value = saved;
       showSettingForm.value = false;
@@ -441,68 +514,59 @@ createApp({
       await loadSettings();
     }
 
-    // --- 測定 ---
+    // ---- 測定 ----
     async function measure() {
       measuring.value = true; measureError.value = '';
       try {
         const res = await API.post('/api/instrument/measure', { setting_id: selectedSetting.value.id });
-        if (res.status === 'success') {
-          latestResult.value = res.data;
-          await loadResults();
-        } else {
-          measureError.value = res.detail || '測定失敗';
-        }
-      } catch (e) { measureError.value = '測定エラー: ' + e.message; }
+        if (res.status === 'success') { latestResult.value = res.data; await loadResults(); }
+        else measureError.value = res.detail || '測定失敗';
+      } catch(e) { measureError.value = '測定エラー: ' + e.message; }
       measuring.value = false;
     }
 
-    async function loadResults() {
-      results.value = await API.get('/api/results/?limit=50');
-    }
+    async function loadResults() { results.value = await API.get('/api/results/?limit=50'); }
 
-    // --- WebSocket ---
+    // ---- WebSocket ----
     function connectWS() {
       const proto = location.protocol === 'https:' ? 'wss' : 'ws';
       const ws = new WebSocket(`${proto}://${location.host}/ws`);
-      ws.onmessage = (e) => {
+      ws.onmessage = e => {
         const msg = JSON.parse(e.data);
         if (msg.type === 'measurement_result') {
           latestResult.value = msg.data;
           updateChart(formatDate(msg.data.timestamp), msg.data.tx_power);
           loadResults();
         } else if (msg.type === 'measurement_error') {
-          measureError.value = msg.error;
-          measuring.value = false;
+          measureError.value = msg.error; measuring.value = false;
         }
       };
-      ws.onclose = () => setTimeout(connectWS, 3000); // 自動再接続
+      ws.onclose = () => setTimeout(connectWS, 3000);
     }
 
-    // --- ユーティリティ ---
-    function formatDate(iso) {
-      return new Date(iso).toLocaleString('ja-JP', { hour12: false });
-    }
+    function formatDate(iso) { return new Date(iso).toLocaleString('ja-JP', { hour12: false }); }
 
     onMounted(async () => {
-      initChart();
-      connectWS();
-      await loadSettings();
-      await loadResults();
-      // 接続状態を確認
-      const status = await API.get('/api/instrument/status');
-      connected.value = status.connected;
-      connectHost.value = status.host;
+      initChart(); connectWS();
+      await loadSettings(); await loadResults();
+      const s = await API.get('/api/instrument/status');
+      connected.value = s.connected; connectHost.value = s.host;
     });
 
+    onUnmounted(() => clearInterval(logTimer));
+
     return {
+      page,
       connected, identity, connectHost, connectError, loading,
       measuring, measureError, showSettingForm,
       settings, selectedSetting, results, latestResult,
       form, metrics, bwOptions,
       connect, disconnect, loadSettings,
-      newSetting, selectSetting, editSetting, saveSetting, deleteSetting,
-      onRatChange,
-      measure, loadResults, formatDate,
+      newSetting, selectSetting, editSetting, saveSetting, deleteSetting, onRatChange,
+      measure, loadResults,
+      logs, logFilter, logLoading, logAutoRefresh, logErrorCount,
+      loadLogs, clearLogs, switchToLogs, logBadgeClass, logRowClass,
+      formatDate,
     };
   }
 }).mount('#app');
